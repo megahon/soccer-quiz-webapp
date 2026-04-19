@@ -1,26 +1,80 @@
-@import "tailwindcss";
-
+/* ===========================
+   カラーパレット
+=========================== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0a0a0f;
+  --surface: #13131a;
+  --surface2: #1c1c28;
+  --border: #2a2a3a;
+
+  --accent: #e8ff47;
+  --accent2: #4af0c4;
+
+  --text: #f0f0f8;
+  --text-muted: #6b6b88;
+  --danger: #ff4a6e;
+
+  /* リーグバッジ */
+  --j1: #e8ff47;
+  --j2: #4af0c4;
+  --j3: #ff9a4a;
+
+  /* ポジション */
+  --pos-gk-bg: rgba(255, 74, 110, 0.18);
+  --pos-gk-text: #ff4a6e;
+  --pos-df-bg: rgba(74, 240, 196, 0.18);
+  --pos-df-text: #4af0c4;
+  --pos-mf-bg: rgba(232, 255, 71, 0.18);
+  --pos-mf-text: #e8ff47;
+  --pos-fw-bg: rgba(255, 154, 74, 0.18);
+  --pos-fw-text: #ff9a4a;
+
+  /* フォント */
+  --font-sans: var(--font-noto-sans-jp), sans-serif;
+  --font-display: var(--font-bebas-neue), sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ===========================
+   ベーススタイル
+=========================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+img {
+  display: block;
+  max-width: 100%;
 }
