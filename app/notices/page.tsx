@@ -1,5 +1,11 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getNotices } from '@/lib/db'
+
+export const metadata: Metadata = {
+  title: 'お知らせ',
+  description: 'Jリーグ背番号クイズのお知らせ一覧です。',
+}
 
 export default async function NoticesPage() {
   const notices = await getNotices() ?? []
