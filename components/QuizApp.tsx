@@ -410,7 +410,6 @@ export default function QuizApp({ teams, notices }: QuizAppProps) {
           <div style={{ flex: '0 0 auto' }}>{appTitle}</div>
           <div style={{ flex: 1, display: 'flex', gap: '1.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <span style={{ color: 'var(--text-muted)' }}>問題 <strong style={{ color: 'var(--text)' }}>{currentIndex + 1}/{questions.length}</strong></span>
-            <span style={{ color: 'var(--text-muted)' }}>正解 <strong style={{ color: 'var(--accent)' }}>{score.correct}</strong></span>
             <span style={{ color: 'var(--text-muted)' }}>スキップ <strong style={{ color: 'var(--text)' }}>{score.skip}</strong></span>
             <span style={{ color: 'var(--text-muted)' }}>残り <strong style={{ color: 'var(--text)' }}>{remaining}</strong></span>
           </div>
