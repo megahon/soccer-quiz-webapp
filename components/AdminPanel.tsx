@@ -27,7 +27,7 @@ function PosBadge({ pos }: { pos: Position }) {
 
 function ColorStripes({ colors }: { colors: [string, string, string] }) {
   return (
-    <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '20px', borderRadius: '5px', overflow: 'hidden' }}>
       {colors.map((c, i) => <div key={i} style={{ flex: 1, backgroundColor: c }} />)}
     </div>
   )

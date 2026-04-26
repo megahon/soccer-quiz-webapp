@@ -43,7 +43,7 @@ export async function getTeams(): Promise<Team[] | null> {
   const { data, error } = await supabaseAdmin
     .from('teams')
     .select('*')
-    .order('id')
+    .order('name')
   if (error) throw new Error(error.message)
   return data.map(toTeam)
 }

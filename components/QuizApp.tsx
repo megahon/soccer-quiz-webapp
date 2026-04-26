@@ -4,9 +4,9 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import type { Team, Player, Notice, League, Position } from '@/lib/types'
 
-type Phase = 'teamSelect' | 'modeSelect' | 'quiz' | 'result'
+type Phase = 'teamSelect' | 'modeSelect' | 'playerList' | 'quiz' | 'result'
 type QuizMode = 'order' | 'random' | 'position'
-type LeagueFilter = League | 'ALL'
+type LeagueFilter = League
 
 interface Score { correct: number; skip: number }
 
@@ -42,7 +42,7 @@ const POS_COLORS: Record<Position, { bg: string; text: string }> = {
 
 export default function QuizApp({ teams, notices }: QuizAppProps) {
   const [phase, setPhase] = useState<Phase>('teamSelect')
-  const [leagueFilter, setLeagueFilter] = useState<LeagueFilter>('ALL')
+  const [leagueFilter, setLeagueFilter] = useState<LeagueFilter>('J1')
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
   const [quizMode, setQuizMode] = useState<QuizMode | null>(null)
   const [selectedPos, setSelectedPos] = useState<Position | null>(null)
@@ -53,10 +53,9 @@ export default function QuizApp({ teams, notices }: QuizAppProps) {
   const [revealed, setRevealed] = useState(false)
   const [score, setScore] = useState<Score>({ correct: 0, skip: 0 })
 
-  const filteredTeams = useMemo(
-    () => leagueFilter === 'ALL' ? teams : teams.filter(t => t.league === leagueFilter),
-    [teams, leagueFilter]
-  )
+  const filteredTeams = useMemo(() => {
+    return teams.filter(t => t.league === leagueFilter).sort((a, b) => a.name.localeCompare(b.name, 'ja'))
+  }, [teams, leagueFilter])
 
   function selectTeam(team: Team) {
     setSelectedTeam(team)
@@ -150,9 +149,9 @@ export default function QuizApp({ teams, notices }: QuizAppProps) {
 
         {/* リーグフィルター */}
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
-          {(['ALL', 'J1', 'J2', 'J3'] as const).map(l => {
+          {(['J1', 'J2', 'J3'] as const).map(l => {
             const active = leagueFilter === l
-            const color = l === 'ALL' ? 'var(--accent)' : LEAGUE_COLORS[l]
+            const color = LEAGUE_COLORS[l]
             return (
               <button
                 key={l}
@@ -165,7 +164,7 @@ export default function QuizApp({ teams, notices }: QuizAppProps) {
                   fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', transition: 'all 0.15s',
                 }}
               >
-                {l === 'ALL' ? 'すべて' : l}
+                {l}
               </button>
             )
           })}
@@ -178,7 +177,7 @@ export default function QuizApp({ teams, notices }: QuizAppProps) {
               key={team.id}
               onClick={() => selectTeam(team)}
               style={{
-                backgroundColor: 'var(--surface)', border: '1px solid var(--border)',
+                backgroundColor: 'var(--surface2)', border: '1px solid var(--border)',
                 borderRadius: '0.75rem', padding: '0.875rem 0.75rem',
                 cursor: 'pointer', textAlign: 'left', color: 'var(--text)',
                 transition: 'border-color 0.15s, transform 0.1s',
@@ -187,7 +186,7 @@ export default function QuizApp({ teams, notices }: QuizAppProps) {
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)' }}
             >
               {/* カラーストライプ */}
-              <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.65rem' }}>
+              <div style={{ display: 'flex', height: '20px', borderRadius: '5px', overflow: 'hidden', marginBottom: '0.65rem' }}>
                 {team.colors.map((c, i) => <div key={i} style={{ flex: 1, backgroundColor: c }} />)}
               </div>
               {/* リーグバッジ */}
@@ -214,7 +213,7 @@ export default function QuizApp({ teams, notices }: QuizAppProps) {
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '1rem', padding: '2rem' }}>
             {/* チーム情報 */}
             <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-              <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', height: '20px', borderRadius: '5px', overflow: 'hidden', marginBottom: '0.75rem' }}>
                 {selectedTeam?.colors.map((c, i) => <div key={i} style={{ flex: 1, backgroundColor: c }} />)}
               </div>
               <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{selectedTeam?.name}</div>
@@ -293,18 +292,99 @@ export default function QuizApp({ teams, notices }: QuizAppProps) {
             )}
 
             {/* スタートボタン */}
-            <button
-              onClick={startQuiz}
-              disabled={!canStart}
-              style={{
-                width: '100%', padding: '0.8rem', border: 'none', borderRadius: '0.5rem',
-                backgroundColor: canStart ? 'var(--accent)' : 'var(--border)',
-                color: canStart ? '#0a0a0f' : 'var(--text-muted)',
-                fontWeight: 700, fontSize: '1rem', cursor: canStart ? 'pointer' : 'not-allowed', transition: 'background-color 0.15s',
-              }}
-            >
-              {playersLoading ? '読み込み中...' : 'スタート'}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
+                onClick={startQuiz}
+                disabled={!canStart}
+                style={{
+                  width: '100%', padding: '0.8rem', border: 'none', borderRadius: '0.5rem',
+                  backgroundColor: canStart ? 'var(--accent)' : 'var(--border)',
+                  color: canStart ? '#0a0a0f' : 'var(--text-muted)',
+                  fontWeight: 700, fontSize: '1rem', cursor: canStart ? 'pointer' : 'not-allowed', transition: 'background-color 0.15s',
+                }}
+              >
+                {playersLoading ? '読み込み中...' : 'スタート'}
+              </button>
+              <button
+                onClick={() => setPhase('playerList')}
+                disabled={playersLoading}
+                style={{
+                  width: '100%', padding: '0.7rem', border: '1px solid var(--border)', borderRadius: '0.5rem',
+                  backgroundColor: 'transparent', color: 'var(--text-muted)',
+                  fontWeight: 600, fontSize: '0.9rem', cursor: playersLoading ? 'not-allowed' : 'pointer',
+                  transition: 'border-color 0.15s, color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.color = 'var(--text)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+              >
+                選手一覧を確認する
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ===== 選手一覧 =====
+  if (phase === 'playerList') {
+    const byPos: Record<Position, Player[]> = { GK: [], DF: [], MF: [], FW: [] }
+    for (const p of players) byPos[p.pos].push(p)
+
+    return (
+      <div style={{ ...sPage, alignItems: 'center' }}>
+        <div style={sFixedHeader}>{appTitle}</div>
+        <div style={{ maxWidth: '480px', width: '100%' }}>
+          <button onClick={() => setPhase('modeSelect')} style={sBackBtn}>← モード選択に戻る</button>
+
+          {/* チーム情報 */}
+          <div style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
+            <div style={{ display: 'flex', height: '20px', borderRadius: '5px', overflow: 'hidden', marginBottom: '0.6rem' }}>
+              {selectedTeam?.colors.map((c, i) => <div key={i} style={{ flex: 1, backgroundColor: c }} />)}
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{selectedTeam?.name}</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{players.length}名</div>
+          </div>
+
+          {/* ポジション別一覧 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {(['GK', 'DF', 'MF', 'FW'] as Position[]).map(pos => {
+              const list = byPos[pos]
+              if (list.length === 0) return null
+              return (
+                <div key={pos}>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                    marginBottom: '0.5rem',
+                  }}>
+                    <span style={{
+                      padding: '0.2rem 0.65rem', borderRadius: '0.25rem', fontSize: '0.83rem', fontWeight: 700,
+                      backgroundColor: POS_COLORS[pos].bg, color: POS_COLORS[pos].text,
+                    }}>
+                      {pos}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{list.length}名</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                    {list.sort((a, b) => a.num - b.num).map(p => (
+                      <div key={p.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '0.75rem',
+                        backgroundColor: 'var(--surface2)', border: '1px solid var(--border)',
+                        borderRadius: '0.5rem', padding: '0.55rem 0.85rem',
+                      }}>
+                        <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--accent)', minWidth: '2rem', textAlign: 'center', lineHeight: 1 }}>
+                          {p.num}
+                        </span>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{p.name}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{p.furi}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
