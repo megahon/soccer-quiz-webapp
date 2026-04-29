@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Noto_Sans_JP, Bebas_Neue } from 'next/font/google'
 import './globals.css'
 import Toast from '@/components/Toast'
+import { Analytics } from '@vercel/analytics/react'
 
 const notoSansJP = Noto_Sans_JP({
   variable: '--font-noto-sans-jp',
@@ -52,6 +53,7 @@ export default function RootLayout({
       <body>
         {children}
         <Toast />
+        <Analytics />
       </body>
     </html>
   )
