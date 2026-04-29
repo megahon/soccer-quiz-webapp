@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { showToast } from './Toast'
 import type { Team, Player, Notice, League, Position } from '@/lib/types'
 
@@ -39,6 +39,207 @@ function LeagueBadge({ league }: { league: League }) {
     <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#0a0a0f', backgroundColor: color, padding: '0.1rem 0.4rem', borderRadius: '0.2rem' }}>
       {league}
     </span>
+  )
+}
+
+// ===== 一括インポート =====
+
+type ParsedRow = {
+  num: number | null
+  name: string
+  furi: string
+  pos: string
+  error: string | null
+}
+
+const VALID_POSITIONS = new Set(['GK', 'DF', 'MF', 'FW'])
+
+function parseText(text: string): ParsedRow[] {
+  return text
+    .split('\n')
+    .map(line => line.trim().replace(/\r$/, ''))
+    .filter(line => line.length > 0)
+    .flatMap((line): ParsedRow[] => {
+      const sep = line.includes('\t') ? '\t' : ','
+      const cols = line.split(sep).map(c => c.trim().replace(/^["']|["']$/g, ''))
+      const rawNum = cols[0] ?? ''
+      if (rawNum === '' || isNaN(Number(rawNum))) return []
+      const num = parseInt(rawNum)
+      const name = cols[1] ?? ''
+      const furi = cols[2] ?? ''
+      const rawPos = cols[3] ?? ''
+      const pos = rawPos.toUpperCase()
+      if (cols.length < 4) return [{ num, name, furi, pos, error: '4列必要: 背番号・選手名・ふりがな・ポジション' }]
+      if (num < 1) return [{ num: null, name, furi, pos, error: '背番号は1以上の整数' }]
+      if (!name) return [{ num, name, furi, pos, error: '選手名は必須です' }]
+      if (!furi) return [{ num, name, furi, pos, error: 'ふりがなは必須です' }]
+      if (!VALID_POSITIONS.has(pos)) return [{ num, name, furi, pos, error: `ポジションはGK/DF/MF/FWのいずれか` }]
+      return [{ num, name, furi, pos, error: null }]
+    })
+}
+
+function BulkImportPanel({ teams, onReload }: { teams: Team[]; onReload: () => void }) {
+  const [teamId, setTeamId] = useState(teams[0]?.id ?? 0)
+  const [inputMode, setInputMode] = useState<'paste' | 'file'>('paste')
+  const [rawText, setRawText] = useState('')
+  const [rows, setRows] = useState<ParsedRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (teams.length > 0 && teamId === 0) setTeamId(teams[0].id)
+  }, [teams, teamId])
+
+  function handleTextChange(text: string) {
+    setRawText(text)
+    setRows(parseText(text))
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const text = ev.target?.result as string
+      setRawText(text)
+      setRows(parseText(text))
+    }
+    reader.readAsText(file, 'UTF-8')
+  }
+
+  const validRows = rows.filter(r => r.error === null)
+  const errorCount = rows.filter(r => r.error !== null).length
+
+  async function handleImport() {
+    if (validRows.length === 0) return
+    setLoading(true)
+    try {
+      const players = validRows.map(r => ({ teamId, num: r.num, name: r.name, furi: r.furi, pos: r.pos }))
+      const res = await fetch('/api/players', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ players }),
+      })
+      if (!res.ok) throw new Error()
+      showToast(`${validRows.length}件の選手を登録しました`, 'success')
+      setRawText('')
+      setRows([])
+      if (fileRef.current) fileRef.current.value = ''
+      onReload()
+    } catch {
+      showToast('エラーが発生しました', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={sFormCard}>
+      <h2 style={sH2}>一括インポート</h2>
+      <div style={sForm}>
+        <label style={sLabel}>チーム</label>
+        <select style={sInput} value={teamId} onChange={e => setTeamId(Number(e.target.value))}>
+          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+
+        <label style={sLabel}>入力方法</label>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {(['paste', 'file'] as const).map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => { setInputMode(m); setRawText(''); setRows([]) }}
+              style={{
+                ...sEditBtn,
+                backgroundColor: inputMode === m ? 'var(--accent)' : 'var(--surface2)',
+                color: inputMode === m ? '#0a0a0f' : 'var(--text)',
+                borderColor: inputMode === m ? 'var(--accent)' : 'var(--border)',
+                fontWeight: inputMode === m ? 700 : 400,
+                fontSize: '0.8rem',
+              }}
+            >
+              {m === 'paste' ? 'テキスト貼り付け' : 'CSVファイル'}
+            </button>
+          ))}
+        </div>
+
+        {inputMode === 'paste' ? (
+          <>
+            <label style={sLabel}>貼り付け（背番号・選手名・ふりがな・ポジション）</label>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '-0.3rem' }}>
+              タブ区切り（スプレッドシートからコピペ可）またはカンマ区切り
+            </span>
+            <textarea
+              style={{ ...sInput, minHeight: '140px', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.8rem' }}
+              value={rawText}
+              onChange={e => handleTextChange(e.target.value)}
+              placeholder={'1\t山田太郎\tやまだたろう\tGK\n2\t鈴木一郎\tすずきいちろう\tDF'}
+            />
+          </>
+        ) : (
+          <>
+            <label style={sLabel}>CSVファイルを選択</label>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '-0.3rem' }}>
+              形式: 背番号,選手名,ふりがな,ポジション（ヘッダー行は自動スキップ）
+            </span>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,.tsv,.txt"
+              onChange={handleFileChange}
+              style={{ ...sInput, padding: '0.4rem', cursor: 'pointer' }}
+            />
+          </>
+        )}
+
+        {rows.length > 0 && (
+          <>
+            <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.8rem' }}>
+              <span style={{ color: 'var(--accent2)' }}>✓ 有効 {validRows.length}件</span>
+              {errorCount > 0 && <span style={{ color: 'var(--danger)' }}>✗ エラー {errorCount}件</span>}
+            </div>
+            <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '0.375rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                <thead>
+                  <tr>
+                    {['#', '名前', 'ふりがな', 'POS'].map(h => (
+                      <th key={h} style={{ padding: '0.3rem 0.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: 'var(--surface2)' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, i) => (
+                    <tr
+                      key={i}
+                      title={row.error ?? undefined}
+                      style={{ backgroundColor: row.error ? 'rgba(255,74,110,0.08)' : 'transparent', borderTop: '1px solid var(--border)' }}
+                    >
+                      <td style={{ padding: '0.25rem 0.5rem', color: row.error ? 'var(--danger)' : 'var(--accent)', fontFamily: 'var(--font-display)' }}>{row.num ?? '—'}</td>
+                      <td style={{ padding: '0.25rem 0.5rem', color: row.error ? 'var(--danger)' : 'var(--text)' }}>{row.name || '—'}</td>
+                      <td style={{ padding: '0.25rem 0.5rem', color: 'var(--text-muted)', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.furi || '—'}</td>
+                      <td style={{ padding: '0.25rem 0.5rem' }}>
+                        {row.error
+                          ? <span style={{ color: 'var(--danger)', fontSize: '0.7rem' }} title={row.error}>エラー</span>
+                          : <PosBadge pos={row.pos as Position} />}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        <button
+          type="button"
+          onClick={handleImport}
+          disabled={loading || validRows.length === 0}
+          style={{ ...sPrimaryBtn, opacity: validRows.length === 0 ? 0.4 : 1 }}
+        >
+          {loading ? '登録中...' : `登録する（${validRows.length}件）`}
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -175,6 +376,7 @@ function PlayerSection({ players, teams, onReload }: { players: Player[]; teams:
   const [editingId, setEditingId] = useState<number | null>(null)
   const [filterTeamId, setFilterTeamId] = useState<number | 'all'>('all')
   const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState<'single' | 'bulk'>('single')
 
   useEffect(() => {
     if (form.teamId === 0 && teams.length > 0) {
@@ -232,7 +434,7 @@ function PlayerSection({ players, teams, onReload }: { players: Player[]; teams:
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `1fr ${mode === 'bulk' ? '420px' : '300px'}`, gap: '1.5rem', alignItems: 'start' }}>
       {/* 一覧 */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
@@ -269,34 +471,59 @@ function PlayerSection({ players, teams, onReload }: { players: Player[]; teams:
         </div>
       </div>
 
-      {/* フォーム */}
-      <div style={sFormCard}>
-        <h2 style={sH2}>{editingId ? '選手を編集' : '選手を追加'}</h2>
-        <form onSubmit={handleSubmit} style={sForm}>
-          <label style={sLabel}>チーム</label>
-          <select style={sInput} value={form.teamId} onChange={e => setForm(f => ({ ...f, teamId: Number(e.target.value) }))}>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+      {/* フォーム/インポート */}
+      <div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          {(['single', 'bulk'] as const).map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              style={{
+                padding: '0.35rem 0.75rem', borderRadius: '0.375rem', border: '1px solid',
+                borderColor: mode === m ? 'var(--accent)' : 'var(--border)',
+                backgroundColor: mode === m ? 'var(--accent)' : 'transparent',
+                color: mode === m ? '#0a0a0f' : 'var(--text-muted)',
+                fontWeight: mode === m ? 700 : 400,
+                cursor: 'pointer', fontSize: '0.83rem',
+              }}
+            >
+              {m === 'single' ? '1件ずつ' : '一括インポート'}
+            </button>
+          ))}
+        </div>
+        {mode === 'single' ? (
+          <div style={sFormCard}>
+            <h2 style={sH2}>{editingId ? '選手を編集' : '選手を追加'}</h2>
+            <form onSubmit={handleSubmit} style={sForm}>
+              <label style={sLabel}>チーム</label>
+              <select style={sInput} value={form.teamId} onChange={e => setForm(f => ({ ...f, teamId: Number(e.target.value) }))}>
+                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
 
-          <label style={sLabel}>背番号</label>
-          <input type="number" style={sInput} value={form.num} onChange={e => setForm(f => ({ ...f, num: e.target.value }))} required min={1} />
+              <label style={sLabel}>背番号</label>
+              <input type="number" style={sInput} value={form.num} onChange={e => setForm(f => ({ ...f, num: e.target.value }))} required min={1} />
 
-          <label style={sLabel}>選手名</label>
-          <input style={sInput} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+              <label style={sLabel}>選手名</label>
+              <input style={sInput} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
 
-          <label style={sLabel}>ふりがな</label>
-          <input style={sInput} value={form.furi} onChange={e => setForm(f => ({ ...f, furi: e.target.value }))} required />
+              <label style={sLabel}>ふりがな</label>
+              <input style={sInput} value={form.furi} onChange={e => setForm(f => ({ ...f, furi: e.target.value }))} required />
 
-          <label style={sLabel}>ポジション</label>
-          <select style={sInput} value={form.pos} onChange={e => setForm(f => ({ ...f, pos: e.target.value as Position }))}>
-            {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+              <label style={sLabel}>ポジション</label>
+              <select style={sInput} value={form.pos} onChange={e => setForm(f => ({ ...f, pos: e.target.value as Position }))}>
+                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="submit" disabled={loading} style={sPrimaryBtn}>{editingId ? '更新' : '追加'}</button>
-            {editingId && <button type="button" onClick={cancelEdit} style={sCancelBtn}>キャンセル</button>}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="submit" disabled={loading} style={sPrimaryBtn}>{editingId ? '更新' : '追加'}</button>
+                {editingId && <button type="button" onClick={cancelEdit} style={sCancelBtn}>キャンセル</button>}
+              </div>
+            </form>
           </div>
-        </form>
+        ) : (
+          <BulkImportPanel teams={teams} onReload={onReload} />
+        )}
       </div>
     </div>
   )

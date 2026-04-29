@@ -129,6 +129,25 @@ export async function createPlayer(
   return toPlayer(row)
 }
 
+export async function bulkCreatePlayers(
+  players: Omit<Player, 'id'>[]
+): Promise<Player[]> {
+  if (!supabaseAdmin) throw new Error('Supabase is not configured')
+  const rows = players.map(p => ({
+    team_id: p.teamId,
+    num: p.num,
+    name: p.name,
+    furi: p.furi,
+    pos: p.pos,
+  }))
+  const { data, error } = await supabaseAdmin
+    .from('players')
+    .insert(rows)
+    .select()
+  if (error) throw new Error(error.message)
+  return data.map(toPlayer)
+}
+
 export async function updatePlayer(
   id: number,
   data: Omit<Player, 'id'>
