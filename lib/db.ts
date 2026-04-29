@@ -88,14 +88,23 @@ export async function deleteTeam(id: number): Promise<void> {
 
 export async function getPlayers(): Promise<Player[] | null> {
   if (!supabaseAdmin) return null
-  const { data, error } = await supabaseAdmin
-    .from('players')
-    .select('*')
-    .order('team_id')
-    .order('num')
-    .limit(10000)
-  if (error) throw new Error(error.message)
-  return data.map(toPlayer)
+  const PAGE = 1000
+  const rows: Record<string, unknown>[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('players')
+      .select('*')
+      .order('team_id')
+      .order('num')
+      .range(from, from + PAGE - 1)
+    if (error) throw new Error(error.message)
+    if (!data || data.length === 0) break
+    rows.push(...data)
+    if (data.length < PAGE) break
+    from += PAGE
+  }
+  return rows.map(toPlayer)
 }
 
 export async function getPlayersByTeam(teamId: number): Promise<Player[] | null> {
