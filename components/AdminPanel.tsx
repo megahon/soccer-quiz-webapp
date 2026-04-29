@@ -63,17 +63,17 @@ function parseText(text: string): ParsedRow[] {
       const sep = line.includes('\t') ? '\t' : ','
       const cols = line.split(sep).map(c => c.trim().replace(/^["']|["']$/g, ''))
       const rawNum = cols[0] ?? ''
+      // 先頭列が数字でない行はヘッダーとみなしてスキップ
       if (rawNum === '' || isNaN(Number(rawNum))) return []
+      if (cols.length < 4) return [{ num: parseInt(rawNum), name: cols[1] ?? '', furi: cols[2] ?? '', pos: '', error: '4列必要: 背番号・選手名・ふりがな・ポジション' }]
       const num = parseInt(rawNum)
-      const name = cols[1] ?? ''
-      const furi = cols[2] ?? ''
-      const rawPos = cols[3] ?? ''
-      const pos = rawPos.toUpperCase()
-      if (cols.length < 4) return [{ num, name, furi, pos, error: '4列必要: 背番号・選手名・ふりがな・ポジション' }]
+      const name = cols[1]
+      const furi = cols[2]
+      const pos = cols[3].toUpperCase()
       if (num < 1) return [{ num: null, name, furi, pos, error: '背番号は1以上の整数' }]
       if (!name) return [{ num, name, furi, pos, error: '選手名は必須です' }]
       if (!furi) return [{ num, name, furi, pos, error: 'ふりがなは必須です' }]
-      if (!VALID_POSITIONS.has(pos)) return [{ num, name, furi, pos, error: `ポジションはGK/DF/MF/FWのいずれか` }]
+      if (!VALID_POSITIONS.has(pos)) return [{ num, name, furi, pos, error: `ポジションはGK/DF/MF/FWのいずれか（入力値: "${cols[3]}"）` }]
       return [{ num, name, furi, pos, error: null }]
     })
 }
@@ -101,8 +101,19 @@ function BulkImportPanel({ teams, onReload }: { teams: Team[]; onReload: () => v
     const reader = new FileReader()
     reader.onload = ev => {
       const text = ev.target?.result as string
-      setRawText(text)
-      setRows(parseText(text))
+      // 文字化け（U+FFFD）が含まれていれば Shift-JIS で再試行（Excel製CSVへの対応）
+      if (text.includes('�')) {
+        const r2 = new FileReader()
+        r2.onload = ev2 => {
+          const t = ev2.target?.result as string
+          setRawText(t)
+          setRows(parseText(t))
+        }
+        r2.readAsText(file, 'Shift_JIS')
+      } else {
+        setRawText(text)
+        setRows(parseText(text))
+      }
     }
     reader.readAsText(file, 'UTF-8')
   }
@@ -120,14 +131,17 @@ function BulkImportPanel({ teams, onReload }: { teams: Team[]; onReload: () => v
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ players }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? `登録に失敗しました (HTTP ${res.status})`)
+      }
       showToast(`${validRows.length}件の選手を登録しました`, 'success')
       setRawText('')
       setRows([])
       if (fileRef.current) fileRef.current.value = ''
       onReload()
-    } catch {
-      showToast('エラーが発生しました', 'error')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'エラーが発生しました', 'error')
     } finally {
       setLoading(false)
     }

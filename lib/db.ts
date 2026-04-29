@@ -93,6 +93,7 @@ export async function getPlayers(): Promise<Player[] | null> {
     .select('*')
     .order('team_id')
     .order('num')
+    .limit(10000)
   if (error) throw new Error(error.message)
   return data.map(toPlayer)
 }
