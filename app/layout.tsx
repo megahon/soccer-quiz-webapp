@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     default: 'Jリーグ背番号クイズ',
     template: '%s | Jリーグ背番号クイズ',
   },
-  description: 'Jリーグ選手の背番号を当てるクイズアプリ。J1・J2・J3の全チームに対応。背番号順・ランダム・ポジション別の3モードで楽しく暗記できます。',
+  description: 'Jリーグの選手名を背番号から当てるクイズアプリ。J1・J2・J3の全チームに対応。背番号順・ランダム・ポジション別の3モードで楽しく暗記できます。',
   keywords: ['Jリーグ', '背番号', 'クイズ', 'サッカー', 'J1', 'J2', 'J3', '選手', '暗記'],
   openGraph: {
     type: 'website',
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     url: siteUrl,
     siteName: 'Jリーグ背番号クイズ',
     title: 'Jリーグ背番号クイズ',
-    description: 'Jリーグ選手の背番号を当てるクイズアプリ。J1・J2・J3の全チームに対応。',
+    description: 'Jリーグの選手名を背番号から当てるクイズアプリ。J1・J2・J3の全チームに対応。',
   },
   alternates: {
     canonical: siteUrl,
