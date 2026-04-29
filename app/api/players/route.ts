@@ -23,10 +23,15 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
 
   if (Array.isArray(body.players)) {
-    const players = await bulkCreatePlayers(body.players)
-    const teamIds = [...new Set<number>(body.players.map((p: { teamId: number }) => p.teamId))]
-    for (const id of teamIds) revalidateTag(`players-${id}`, 'max')
-    return Response.json(players, { status: 201 })
+    try {
+      const players = await bulkCreatePlayers(body.players)
+      const teamIds = [...new Set<number>(body.players.map((p: { teamId: number }) => p.teamId))]
+      for (const id of teamIds) revalidateTag(`players-${id}`, 'max')
+      return Response.json(players, { status: 201 })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '一括登録に失敗しました'
+      return Response.json({ error: message }, { status: 500 })
+    }
   }
 
   const { teamId, num, name, furi, pos } = body
